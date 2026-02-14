@@ -11,7 +11,11 @@ const allowedOrigins = new Set([
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'http://localhost:5174',
-  'http://127.0.0.1:5174'
+  'http://127.0.0.1:5174',
+  'https://lexachat-funclexa.vercel.app',
+  'https://www.lexachat-funclexa.vercel.app',
+  'https://funclexa.me',
+  'https://www.funclexa.me'
 ]);
 
 if (process.env.CLIENT_URL) {
@@ -33,6 +37,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json());
 
 app.get('/api/health', (_req, res) => {
