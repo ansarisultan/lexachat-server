@@ -189,6 +189,9 @@ const buildVerifyEmailHtml = ({ name, verifyUrl }) => {
                 <p style="margin:0 0 14px;font-size:16px;line-height:1.7;">
                   Thanks for signing up for FuncLexa. Please verify your email to activate your account.
                 </p>
+                <p style="margin:0 0 14px;font-size:15px;line-height:1.7;color:#cbd5e1;">
+                  <strong>Thank you for choosing FuncLexa.</strong>
+                </p>
                 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0;">
                   <tr>
                     <td align="center" style="border-radius:12px;background:#14b8a6;">
@@ -297,6 +300,7 @@ export const sendEmailVerificationEmail = async ({ to, name, verifyUrl }) => {
     `Hi ${name || 'there'},`,
     '',
     'Welcome to FuncLexa.',
+    'Thank you for choosing FuncLexa.',
     `Verify your email: ${verifyUrl}`,
     '',
     'This link expires in 24 hours.'
@@ -369,13 +373,17 @@ export const sendEmailVerificationEmail = async ({ to, name, verifyUrl }) => {
 };
 
 export const sendSignupOtpEmail = async ({ to, name, otp }) => {
-  const subject = 'Your FuncLexa signup verification code';
+  const subject = 'Your FuncLexa OTP is here';
   const text = [
     `Hi ${name || 'there'},`,
     '',
-    `Your FuncLexa signup OTP is: ${otp}`,
+    `Your FuncLexa verification code is: ${otp}`,
     '',
-    'It expires in 10 minutes.'
+    'It expires in 10 minutes.',
+    '',
+    'Thank you for choosing FuncLexa.',
+    '',
+    'You are one step away from starting your FuncLexa journey.'
   ].join('\n');
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -384,17 +392,26 @@ export const sendSignupOtpEmail = async ({ to, name, otp }) => {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Your signup OTP</title>
   </head>
-  <body style="margin:0;padding:24px;background:#0b1120;font-family:Segoe UI,Arial,sans-serif;color:#e5e7eb;">
-    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px;margin:0 auto;background:#111827;border:1px solid #1f2937;border-radius:16px;">
+  <body style="margin:0;padding:20px;background:#070b16;font-family:Segoe UI,Arial,sans-serif;color:#e5e7eb;">
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px;margin:0 auto;background:#0f172a;border:1px solid #1f2937;border-radius:18px;overflow:hidden;">
+      <tr>
+        <td style="padding:24px 24px 20px;background:linear-gradient(135deg,#00e5ff,#22d3ee,#7c3aed);">
+          <div style="font-size:12px;letter-spacing:0.16em;text-transform:uppercase;font-weight:700;color:#06202a;opacity:.9;">FuncLexa Security</div>
+          <h1 style="margin:8px 0 0;font-size:28px;line-height:1.2;color:#04202b;">Email OTP Verification</h1>
+        </td>
+      </tr>
       <tr>
         <td style="padding:24px;">
-          <h1 style="margin:0 0 12px;font-size:24px;color:#e5e7eb;">Verify your email</h1>
-          <p style="margin:0 0 12px;font-size:15px;line-height:1.6;">Hi ${escapeHtml(name || 'there')},</p>
-          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Use this OTP to continue your FuncLexa signup:</p>
-          <div style="display:inline-block;padding:12px 16px;border-radius:10px;background:#14b8a6;color:#06202a;font-size:24px;letter-spacing:0.2em;font-weight:700;">
+          <p style="margin:0 0 12px;font-size:16px;line-height:1.7;color:#e5e7eb;">Hi ${escapeHtml(name || 'there')},</p>
+          <p style="margin:0 0 18px;font-size:15px;line-height:1.7;color:#cbd5e1;">
+            You are almost in. Use this one-time passcode to verify your email and complete signup.
+          </p>
+          <div style="display:inline-block;padding:12px 18px;border-radius:12px;background:#14b8a6;color:#06202a;font-size:26px;letter-spacing:0.22em;font-weight:800;">
             ${escapeHtml(otp)}
           </div>
           <p style="margin:16px 0 0;font-size:13px;color:#94a3b8;">This code expires in 10 minutes.</p>
+          <p style="margin:8px 0 0;font-size:14px;line-height:1.6;color:#cbd5e1;"><strong>Thank you for choosing FuncLexa.</strong></p>
+          <p style="margin:8px 0 0;font-size:13px;color:#94a3b8;">You are one step away from starting your FuncLexa journey.</p>
         </td>
       </tr>
     </table>
