@@ -1,17 +1,60 @@
 import nodemailer from 'nodemailer';
 
+const normalizeUrl = (value) => {
+  if (!value || typeof value !== 'string') return null;
+  const trimmed = value.trim().replace(/\/+$/, '');
+  if (!trimmed) return null;
+
+  try {
+    const parsed = new URL(trimmed);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+    return parsed.toString().replace(/\/+$/, '');
+  } catch {
+    return null;
+  }
+};
+
+const isLikelyApiUrl = (value) => {
+  try {
+    const parsed = new URL(value);
+    return parsed.pathname.startsWith('/api');
+  } catch {
+    return false;
+  }
+};
+
 const getClientBaseUrl = () => {
-  if (process.env.RESET_PASSWORD_URL_BASE) {
-    return process.env.RESET_PASSWORD_URL_BASE.replace(/\/+$/, '');
+  const candidates = [
+    process.env.RESET_PASSWORD_URL_BASE,
+    process.env.FRONTEND_URL,
+    process.env.CLIENT_APP_URL,
+    process.env.WEBSITE_URL,
+    process.env.CLIENT_URL,
+    process.env.APP_URL,
+    ...(process.env.CLIENT_URLS ? process.env.CLIENT_URLS.split(',') : [])
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeUrl(candidate);
+    if (!normalized) continue;
+    if (isLikelyApiUrl(normalized)) continue;
+    return normalized;
   }
 
-  if (process.env.CLIENT_URL) {
-    return process.env.CLIENT_URL.replace(/\/+$/, '');
-  }
+  if (process.env.NODE_ENV === 'production') {
+    const vercelProductionUrl = normalizeUrl(
+      process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : null
+    );
+    if (vercelProductionUrl) return vercelProductionUrl;
 
-  if (process.env.CLIENT_URLS) {
-    const first = process.env.CLIENT_URLS.split(',').map((u) => u.trim()).find(Boolean);
-    if (first) return first.replace(/\/+$/, '');
+    const vercelPreviewUrl = normalizeUrl(
+      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null
+    );
+    if (vercelPreviewUrl) return vercelPreviewUrl;
+
+    return 'https://lexachat-funclexa.vercel.app';
   }
 
   return 'http://localhost:5173';
@@ -64,6 +107,7 @@ export const sendPasswordResetEmail = async ({ to, name, resetUrl }) => {
     'If you did not request this, you can ignore this email.'
   ].join('\n');
 
+  const isProduction = process.env.NODE_ENV === 'production';
   const resendApiKey = process.env.RESEND_API_KEY;
   const resendFrom = process.env.RESEND_FROM || process.env.EMAIL_FROM;
   if (resendApiKey && resendFrom) {
@@ -89,7 +133,11 @@ export const sendPasswordResetEmail = async ({ to, name, resetUrl }) => {
 
       return { delivered: true };
     } catch (error) {
-      // Fall back to SMTP when Resend is configured but unavailable/misconfigured.
+      // In production, fail fast to avoid SMTP timeouts when Resend is intended provider.
+      if (isProduction) {
+        throw error;
+      }
+      // In non-production, allow SMTP fallback for local testing.
       console.error('Resend delivery failed, falling back to SMTP:', error?.message || error);
     }
   }
