@@ -34,6 +34,18 @@ const userSchema = new mongoose.Schema({
     type: Date,
     select: false
   },
+  emailVerified: {
+    type: Boolean,
+    default: false
+  },
+  emailVerificationToken: {
+    type: String,
+    select: false
+  },
+  emailVerificationExpires: {
+    type: Date,
+    select: false
+  },
   role: {
     type: String,
     enum: ['user', 'admin'],
@@ -93,6 +105,19 @@ userSchema.methods.createPasswordResetToken = function() {
 
   this.passwordResetExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
   return resetToken;
+};
+
+// Create email verification token (store hashed token, return plain token)
+userSchema.methods.createEmailVerificationToken = function() {
+  const verificationToken = crypto.randomBytes(32).toString('hex');
+
+  this.emailVerificationToken = crypto
+    .createHash('sha256')
+    .update(verificationToken)
+    .digest('hex');
+
+  this.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  return verificationToken;
 };
 
 // Remove sensitive data when converting to JSON

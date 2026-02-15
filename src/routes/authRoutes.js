@@ -8,7 +8,11 @@ import {
   updatePreferences,
   changePassword,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  verifyEmail,
+  resendVerification,
+  sendSignupOtp,
+  verifySignupOtp
 } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { validate } from '../middleware/validateMiddleware.js';
@@ -84,11 +88,48 @@ const resetPasswordValidation = [
     .withMessage('Password must contain at least one uppercase letter')
 ];
 
+const resendVerificationValidation = [
+  body('email')
+    .isEmail()
+    .withMessage('Please provide a valid email')
+    .normalizeEmail()
+    .toLowerCase()
+];
+
+const sendSignupOtpValidation = [
+  body('email')
+    .isEmail()
+    .withMessage('Please provide a valid email')
+    .normalizeEmail()
+    .toLowerCase(),
+  body('name')
+    .optional()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Name must be between 1 and 50 characters')
+];
+
+const verifySignupOtpValidation = [
+  body('email')
+    .isEmail()
+    .withMessage('Please provide a valid email')
+    .normalizeEmail()
+    .toLowerCase(),
+  body('otp')
+    .isLength({ min: 6, max: 6 })
+    .withMessage('OTP must be 6 digits')
+    .isNumeric()
+    .withMessage('OTP must contain only digits')
+];
+
 // Public routes
 router.post('/signup', requireDatabase, signupValidation, validate, signup);
 router.post('/login', requireDatabase, loginValidation, validate, login);
 router.post('/forgot-password', requireDatabase, forgotPasswordValidation, validate, forgotPassword);
 router.patch('/reset-password/:token', requireDatabase, resetPasswordValidation, validate, resetPassword);
+router.get('/verify-email/:token', requireDatabase, verifyEmail);
+router.post('/resend-verification', requireDatabase, resendVerificationValidation, validate, resendVerification);
+router.post('/send-signup-otp', requireDatabase, sendSignupOtpValidation, validate, sendSignupOtp);
+router.post('/verify-signup-otp', requireDatabase, verifySignupOtpValidation, validate, verifySignupOtp);
 
 // Protected routes
 router.get('/me', requireDatabase, protect, getMe);
