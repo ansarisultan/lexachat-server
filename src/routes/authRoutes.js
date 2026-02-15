@@ -12,7 +12,9 @@ import {
   verifyEmail,
   resendVerification,
   sendSignupOtp,
-  verifySignupOtp
+  verifySignupOtp,
+  sendLoginVerificationOtp,
+  verifyLoginVerificationOtp
 } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { validate } from '../middleware/validateMiddleware.js';
@@ -121,6 +123,27 @@ const verifySignupOtpValidation = [
     .withMessage('OTP must contain only digits')
 ];
 
+const sendLoginVerificationOtpValidation = [
+  body('email')
+    .isEmail()
+    .withMessage('Please provide a valid email')
+    .normalizeEmail()
+    .toLowerCase()
+];
+
+const verifyLoginVerificationOtpValidation = [
+  body('email')
+    .isEmail()
+    .withMessage('Please provide a valid email')
+    .normalizeEmail()
+    .toLowerCase(),
+  body('otp')
+    .isLength({ min: 6, max: 6 })
+    .withMessage('OTP must be 6 digits')
+    .isNumeric()
+    .withMessage('OTP must contain only digits')
+];
+
 // Public routes
 router.post('/signup', requireDatabase, signupValidation, validate, signup);
 router.post('/login', requireDatabase, loginValidation, validate, login);
@@ -130,6 +153,8 @@ router.get('/verify-email/:token', requireDatabase, verifyEmail);
 router.post('/resend-verification', requireDatabase, resendVerificationValidation, validate, resendVerification);
 router.post('/send-signup-otp', requireDatabase, sendSignupOtpValidation, validate, sendSignupOtp);
 router.post('/verify-signup-otp', requireDatabase, verifySignupOtpValidation, validate, verifySignupOtp);
+router.post('/send-login-verification-otp', requireDatabase, sendLoginVerificationOtpValidation, validate, sendLoginVerificationOtp);
+router.post('/verify-login-verification-otp', requireDatabase, verifyLoginVerificationOtpValidation, validate, verifyLoginVerificationOtp);
 
 // Protected routes
 router.get('/me', requireDatabase, protect, getMe);

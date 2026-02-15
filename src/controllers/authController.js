@@ -212,7 +212,7 @@ export const login = async (req, res, next) => {
     }
 
     if (user.emailVerified === false) {
-      return next(new AppError('Please verify your email before logging in. Use resend verification if needed.', 403));
+      return next(new AppError('Please verify your email before logging in.', 403));
     }
 
     // Update last login
@@ -224,6 +224,136 @@ export const login = async (req, res, next) => {
 
   } catch (error) {
     next(error);
+  }
+};
+
+// @desc    Send login verification OTP for unverified users
+// @route   POST /api/auth/send-login-verification-otp
+// @access  Public
+export const sendLoginVerificationOtp = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const genericMessage =
+      'If your account exists and is not verified, an OTP has been sent to your email.';
+
+    const user = await User.findOne({ email });
+    if (!user || user.emailVerified !== false) {
+      return res.status(200).json({
+        success: true,
+        message: genericMessage
+      });
+    }
+
+    const otp = `${Math.floor(100000 + Math.random() * 900000)}`;
+    const otpHash = crypto
+      .createHash('sha256')
+      .update(otp)
+      .digest('hex');
+
+    const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    await SignupOtp.findOneAndUpdate(
+      { email },
+      {
+        otpHash,
+        otpExpiresAt,
+        verifiedAt: null,
+        attempts: 0
+      },
+      {
+        upsert: true,
+        new: true,
+        runValidators: true,
+        setDefaultsOnInsert: true
+      }
+    );
+
+    const emailResult = await sendSignupOtpEmail({
+      to: user.email,
+      name: user.name,
+      otp
+    });
+
+    if (!emailResult.delivered && process.env.NODE_ENV === 'production') {
+      return next(new AppError('Email service is not configured. Please contact support.', 503));
+    }
+
+    const response = {
+      success: true,
+      message: genericMessage
+    };
+
+    if (!emailResult.delivered && process.env.NODE_ENV !== 'production') {
+      response.data = {
+        otp,
+        note: 'SMTP is not configured, so OTP is returned for local testing.'
+      };
+    }
+
+    return res.status(200).json(response);
+  } catch (error) {
+    return next(new AppError('Unable to send OTP right now. Please try again later.', 503));
+  }
+};
+
+// @desc    Verify login verification OTP for unverified users
+// @route   POST /api/auth/verify-login-verification-otp
+// @access  Public
+export const verifyLoginVerificationOtp = async (req, res, next) => {
+  try {
+    const { email, otp } = req.body;
+
+    const user = await User.findOne({ email }).select(
+      '+emailVerificationToken +emailVerificationExpires'
+    );
+
+    if (!user) {
+      return next(new AppError('Account not found.', 404));
+    }
+
+    if (user.emailVerified !== false) {
+      return res.status(200).json({
+        success: true,
+        message: 'Email is already verified. You can log in.'
+      });
+    }
+
+    const otpRecord = await SignupOtp.findOne({ email }).select('+otpHash +otpExpiresAt');
+    if (!otpRecord) {
+      return next(new AppError('OTP not found. Please request a new OTP.', 400));
+    }
+
+    if (otpRecord.otpExpiresAt < Date.now()) {
+      return next(new AppError('OTP has expired. Please request a new OTP.', 400));
+    }
+
+    if (otpRecord.attempts >= 5) {
+      return next(new AppError('Too many failed attempts. Please request a new OTP.', 429));
+    }
+
+    const incomingHash = crypto
+      .createHash('sha256')
+      .update(otp)
+      .digest('hex');
+
+    if (incomingHash !== otpRecord.otpHash) {
+      otpRecord.attempts += 1;
+      await otpRecord.save({ validateBeforeSave: false });
+      return next(new AppError('Invalid OTP', 400));
+    }
+
+    user.emailVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save({ validateBeforeSave: false });
+    await SignupOtp.deleteOne({ email });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Email verified successfully. You can now log in.'
+    });
+  } catch (error) {
+    return next(error);
   }
 };
 
