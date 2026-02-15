@@ -232,6 +232,7 @@ export const forgotPassword = async (req, res, next) => {
 
     return res.status(200).json(response);
   } catch (error) {
+    console.error('forgotPassword error:', error?.message || error);
     return next(new AppError('Unable to send reset email right now. Please try again later.', 503));
   }
 };

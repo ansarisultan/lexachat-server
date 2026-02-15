@@ -53,16 +53,6 @@ export const buildResetUrl = (resetToken) => {
 };
 
 export const sendPasswordResetEmail = async ({ to, name, resetUrl }) => {
-  const transport = getTransport();
-  if (!transport) {
-    return { delivered: false, reason: 'SMTP not configured' };
-  }
-
-  const from =
-    process.env.SMTP_FROM ||
-    process.env.EMAIL_FROM ||
-    process.env.SMTP_USER ||
-    process.env.EMAIL_USER;
   const subject = 'Reset your LexaChat password';
   const text = [
     `Hi ${name || 'there'},`,
@@ -73,6 +63,42 @@ export const sendPasswordResetEmail = async ({ to, name, resetUrl }) => {
     'This link expires in 15 minutes.',
     'If you did not request this, you can ignore this email.'
   ].join('\n');
+
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const resendFrom = process.env.RESEND_FROM || process.env.EMAIL_FROM;
+  if (resendApiKey && resendFrom) {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: resendFrom,
+        to: [to],
+        subject,
+        text
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Resend failed: ${response.status} ${errorText}`);
+    }
+
+    return { delivered: true };
+  }
+
+  const transport = getTransport();
+  if (!transport) {
+    return { delivered: false, reason: 'No email provider configured' };
+  }
+
+  const from =
+    process.env.SMTP_FROM ||
+    process.env.EMAIL_FROM ||
+    process.env.SMTP_USER ||
+    process.env.EMAIL_USER;
 
   const sendResult = await Promise.race([
     transport.sendMail({
