@@ -7,7 +7,10 @@ const router = express.Router();
 
 router.post(
   '/chat',
-  [body('messages').isArray({ min: 1 }).withMessage('messages must be a non-empty array')],
+  [
+    body('messages').isArray({ min: 1 }).withMessage('messages must be a non-empty array'),
+    body('webSearchEnabled').optional().isBoolean().withMessage('webSearchEnabled must be a boolean')
+  ],
   validate,
   chatCompletion
 );
