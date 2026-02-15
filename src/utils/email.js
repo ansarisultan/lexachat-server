@@ -25,14 +25,26 @@ const getTransport = () => {
 
   if (!host || !port || !user || !pass) return null;
 
+  const parsedPort = Number(port);
+  const isGmail = String(host).toLowerCase() === 'smtp.gmail.com';
+
   return nodemailer.createTransport({
     host,
-    port: Number(port),
-    secure: Number(port) === 465,
+    port: parsedPort,
+    secure: parsedPort === 465,
+    requireTLS: parsedPort === 587,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
     auth: {
       user,
       pass
-    }
+    },
+    tls: isGmail
+      ? {
+          servername: 'smtp.gmail.com'
+        }
+      : undefined
   });
 };
 
@@ -62,12 +74,21 @@ export const sendPasswordResetEmail = async ({ to, name, resetUrl }) => {
     'If you did not request this, you can ignore this email.'
   ].join('\n');
 
-  await transport.sendMail({
-    from,
-    to,
-    subject,
-    text
-  });
+  const sendResult = await Promise.race([
+    transport.sendMail({
+      from,
+      to,
+      subject,
+      text
+    }),
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('SMTP send timeout')), 15000);
+    })
+  ]);
+
+  if (!sendResult) {
+    throw new Error('SMTP send failed');
+  }
 
   return { delivered: true };
 };

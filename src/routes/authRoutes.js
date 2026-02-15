@@ -91,11 +91,9 @@ router.post('/forgot-password', requireDatabase, forgotPasswordValidation, valid
 router.patch('/reset-password/:token', requireDatabase, resetPasswordValidation, validate, resetPassword);
 
 // Protected routes
-router.use(requireDatabase);
-router.use(protect); // All routes below require authentication
-router.get('/me', getMe);
-router.post('/logout', logout);
-router.patch('/preferences', updatePreferences);
-router.patch('/change-password', changePasswordValidation, validate, changePassword);
+router.get('/me', requireDatabase, protect, getMe);
+router.post('/logout', requireDatabase, protect, logout);
+router.patch('/preferences', requireDatabase, protect, updatePreferences);
+router.patch('/change-password', requireDatabase, protect, changePasswordValidation, validate, changePassword);
 
 export default router;
