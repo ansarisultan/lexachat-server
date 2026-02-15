@@ -15,11 +15,18 @@ const allowedOrigins = new Set([
   'https://lexachat-funclexa.vercel.app',
   'https://www.lexachat-funclexa.vercel.app',
   'https://funclexa.me',
-  'https://www.funclexa.me'
+  'https://www.funclexa.me',
+  'https://lexachat.online',
+  'https://www.lexachat.online'
 ]);
 
-if (process.env.CLIENT_URL) {
-  allowedOrigins.add(process.env.CLIENT_URL);
+const clientUrls = process.env.CLIENT_URLS || process.env.CLIENT_URL;
+if (clientUrls) {
+  clientUrls
+    .split(',')
+    .map((url) => url.trim())
+    .filter(Boolean)
+    .forEach((url) => allowedOrigins.add(url));
 }
 
 const corsOptions = {
