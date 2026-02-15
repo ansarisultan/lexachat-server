@@ -67,26 +67,31 @@ export const sendPasswordResetEmail = async ({ to, name, resetUrl }) => {
   const resendApiKey = process.env.RESEND_API_KEY;
   const resendFrom = process.env.RESEND_FROM || process.env.EMAIL_FROM;
   if (resendApiKey && resendFrom) {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${resendApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        from: resendFrom,
-        to: [to],
-        subject,
-        text
-      })
-    });
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: resendFrom,
+          to: [to],
+          subject,
+          text
+        })
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Resend failed: ${response.status} ${errorText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Resend failed: ${response.status} ${errorText}`);
+      }
+
+      return { delivered: true };
+    } catch (error) {
+      // Fall back to SMTP when Resend is configured but unavailable/misconfigured.
+      console.error('Resend delivery failed, falling back to SMTP:', error?.message || error);
     }
-
-    return { delivered: true };
   }
 
   const transport = getTransport();
