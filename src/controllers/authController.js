@@ -232,10 +232,7 @@ export const forgotPassword = async (req, res, next) => {
 
     return res.status(200).json(response);
   } catch (error) {
-    if (process.env.NODE_ENV === 'production') {
-      return next(new AppError('Unable to send reset email right now. Please try again later.', 503));
-    }
-    next(error);
+    return next(new AppError('Unable to send reset email right now. Please try again later.', 503));
   }
 };
 
