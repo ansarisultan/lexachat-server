@@ -226,8 +226,15 @@ export const forgotPassword = async (req, res, next) => {
       };
     }
 
+    if (!emailResult.delivered && process.env.NODE_ENV === 'production') {
+      return next(new AppError('Email service is not configured. Please contact support.', 503));
+    }
+
     return res.status(200).json(response);
   } catch (error) {
+    if (process.env.NODE_ENV === 'production') {
+      return next(new AppError('Unable to send reset email right now. Please try again later.', 503));
+    }
     next(error);
   }
 };
