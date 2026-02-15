@@ -1,7 +1,8 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import User from '../models/User.js';
 import { AppError } from '../utils/AppError.js';
-import { validationResult } from 'express-validator';
+import { buildResetUrl, sendPasswordResetEmail } from '../utils/email.js';
 
 // Generate JWT Token
 const signToken = (id) => {
@@ -181,6 +182,92 @@ export const changePassword = async (req, res, next) => {
     // Send new token
     createSendToken(user, 200, res);
 
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Forgot password
+// @route   POST /api/auth/forgot-password
+// @access  Public
+export const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const genericMessage =
+      'If an account with that email exists, a password reset link has been sent.';
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message: genericMessage
+      });
+    }
+
+    const resetToken = user.createPasswordResetToken();
+    await user.save({ validateBeforeSave: false });
+
+    const resetUrl = buildResetUrl(resetToken);
+    const emailResult = await sendPasswordResetEmail({
+      to: user.email,
+      name: user.name,
+      resetUrl
+    });
+
+    const response = {
+      success: true,
+      message: genericMessage
+    };
+
+    if (!emailResult.delivered && process.env.NODE_ENV !== 'production') {
+      response.data = {
+        resetUrl,
+        note: 'SMTP is not configured, so reset link is returned for local testing.'
+      };
+    }
+
+    return res.status(200).json(response);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reset password
+// @route   PATCH /api/auth/reset-password/:token
+// @access  Public
+export const resetPassword = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    if (!token) {
+      return next(new AppError('Reset token is required', 400));
+    }
+
+    if (!password) {
+      return next(new AppError('New password is required', 400));
+    }
+
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: Date.now() }
+    }).select('+passwordResetToken +passwordResetExpires +password');
+
+    if (!user) {
+      return next(new AppError('Reset token is invalid or has expired', 400));
+    }
+
+    user.password = password;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+
+    return createSendToken(user, 200, res);
   } catch (error) {
     next(error);
   }

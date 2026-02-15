@@ -6,7 +6,9 @@ import {
   logout, 
   getMe,
   updatePreferences,
-  changePassword
+  changePassword,
+  forgotPassword,
+  resetPassword
 } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { validate } from '../middleware/validateMiddleware.js';
@@ -64,9 +66,29 @@ const changePasswordValidation = [
     .withMessage('New password must contain at least one uppercase letter')
 ];
 
+const forgotPasswordValidation = [
+  body('email')
+    .isEmail()
+    .withMessage('Please provide a valid email')
+    .normalizeEmail()
+    .toLowerCase()
+];
+
+const resetPasswordValidation = [
+  body('password')
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters')
+    .matches(/\d/)
+    .withMessage('Password must contain at least one number')
+    .matches(/[A-Z]/)
+    .withMessage('Password must contain at least one uppercase letter')
+];
+
 // Public routes
 router.post('/signup', requireDatabase, signupValidation, validate, signup);
 router.post('/login', requireDatabase, loginValidation, validate, login);
+router.post('/forgot-password', requireDatabase, forgotPasswordValidation, validate, forgotPassword);
+router.patch('/reset-password/:token', requireDatabase, resetPasswordValidation, validate, resetPassword);
 
 // Protected routes
 router.use(requireDatabase);
