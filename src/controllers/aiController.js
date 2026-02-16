@@ -320,32 +320,40 @@ export const generateImage = async (req, res, next) => {
     const safePrompt = encodeURIComponent(prompt);
 
     const providers = [
-      `https://image.pollinations.ai/prompt/${safePrompt}?model=flux&width=${width}&height=${height}&seed=${seed}&nologo=true&safe=true`,
-      `https://image.pollinations.ai/prompt/${safePrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true&safe=true`
+      (s) => `https://image.pollinations.ai/prompt/${safePrompt}?model=flux&width=${width}&height=${height}&seed=${s}&nologo=true&safe=true`,
+      (s) => `https://image.pollinations.ai/prompt/${safePrompt}?model=turbo&width=${width}&height=${height}&seed=${s}&nologo=true&safe=true`,
+      (s) => `https://image.pollinations.ai/prompt/${safePrompt}?width=${width}&height=${height}&seed=${s}&nologo=true&safe=true`
     ];
 
-    for (const sourceUrl of providers) {
-      try {
-        const upstream = await fetch(sourceUrl, {
-          method: 'GET',
-          headers: {
-            Accept: 'image/*',
-            'User-Agent': 'FuncLexaImageProxy/1.0'
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    for (const buildUrl of providers) {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const attemptSeed = seed + attempt;
+        const sourceUrl = buildUrl(attemptSeed);
+        try {
+          const upstream = await fetch(sourceUrl, {
+            method: 'GET',
+            headers: {
+              Accept: 'image/*',
+              'User-Agent': 'FuncLexaImageProxy/1.0'
+            }
+          });
+
+          if (!upstream.ok) {
+            await sleep(250 * (attempt + 1));
+            continue;
           }
-        });
 
-        if (!upstream.ok) {
-          continue;
+          const arrayBuffer = await upstream.arrayBuffer();
+          const contentType = upstream.headers.get('content-type') || 'image/jpeg';
+
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Cache-Control', 'public, max-age=60');
+          return res.status(200).send(Buffer.from(arrayBuffer));
+        } catch {
+          await sleep(250 * (attempt + 1));
         }
-
-        const arrayBuffer = await upstream.arrayBuffer();
-        const contentType = upstream.headers.get('content-type') || 'image/jpeg';
-
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('Cache-Control', 'public, max-age=60');
-        return res.status(200).send(Buffer.from(arrayBuffer));
-      } catch {
-        // try next provider
       }
     }
 
