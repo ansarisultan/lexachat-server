@@ -11,7 +11,7 @@ export const getSessions = async (req, res, next) => {
     const sessions = await Chat.findByUser(req.user.id, page, limit);
     const total = await Chat.countDocuments({ 
       user: req.user.id, 
-      'metadata.isArchived': false 
+      'metadata.isArchived': { $ne: true } 
     });
 
     res.status(200).json({
@@ -91,6 +91,7 @@ export const saveSession = async (req, res, next) => {
 
     const safeMetadata = {
       ...(metadata && typeof metadata === 'object' ? metadata : {}),
+      isArchived: Boolean(metadata?.isArchived),
       lastMessage:
         typeof metadata?.lastMessage === 'string'
           ? metadata.lastMessage.slice(0, 200)

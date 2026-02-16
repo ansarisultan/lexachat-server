@@ -113,7 +113,7 @@ chatSchema.pre('save', function(next) {
 // Static method to find user's chats
 chatSchema.statics.findByUser = function(userId, page = 1, limit = 20) {
   const skip = (page - 1) * limit;
-  return this.find({ user: userId, 'metadata.isArchived': false })
+  return this.find({ user: userId, 'metadata.isArchived': { $ne: true } })
     .sort({ updatedAt: -1 })
     .skip(skip)
     .limit(limit);
