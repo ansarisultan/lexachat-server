@@ -318,26 +318,63 @@ export const generateImage = async (req, res, next) => {
     const width = Math.min(1024, Math.max(256, Number.parseInt(String(req.query.w || 1024), 10) || 1024));
     const height = Math.min(1024, Math.max(256, Number.parseInt(String(req.query.h || 1024), 10) || 1024));
     const safePrompt = encodeURIComponent(prompt);
-    const sourceUrl = `https://image.pollinations.ai/prompt/${safePrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true&safe=true`;
 
-    const upstream = await fetch(sourceUrl, {
-      method: 'GET',
-      headers: {
-        Accept: 'image/*'
+    const providers = [
+      `https://image.pollinations.ai/prompt/${safePrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true&safe=true`,
+      `https://source.unsplash.com/featured/${width}x${height}?${safePrompt}`,
+      `https://picsum.photos/seed/${encodeURIComponent(`${prompt}-${seed}`)}/${width}/${height}`
+    ];
+
+    for (const sourceUrl of providers) {
+      try {
+        const upstream = await fetch(sourceUrl, {
+          method: 'GET',
+          headers: {
+            Accept: 'image/*',
+            'User-Agent': 'FuncLexaImageProxy/1.0'
+          }
+        });
+
+        if (!upstream.ok) {
+          continue;
+        }
+
+        const arrayBuffer = await upstream.arrayBuffer();
+        const contentType = upstream.headers.get('content-type') || 'image/jpeg';
+
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Cache-Control', 'public, max-age=60');
+        return res.status(200).send(Buffer.from(arrayBuffer));
+      } catch {
+        // try next provider
       }
-    });
-
-    if (!upstream.ok) {
-      const upstreamError = await upstream.text().catch(() => '');
-      return next(new AppError(`Image provider error ${upstream.status}: ${upstreamError || 'Unknown'}`, 502));
     }
 
-    const arrayBuffer = await upstream.arrayBuffer();
-    const contentType = upstream.headers.get('content-type') || 'image/jpeg';
+    // Final fallback: always return a valid SVG image instead of failing with 500/502.
+    const label = prompt.length > 80 ? `${prompt.slice(0, 77)}...` : prompt;
+    const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#bg)" />
+  <text x="50%" y="45%" fill="#e2e8f0" font-family="Arial, sans-serif" font-size="28" text-anchor="middle">
+    Image service is busy
+  </text>
+  <text x="50%" y="53%" fill="#93c5fd" font-family="Arial, sans-serif" font-size="18" text-anchor="middle">
+    Prompt:
+  </text>
+  <text x="50%" y="59%" fill="#cbd5e1" font-family="Arial, sans-serif" font-size="18" text-anchor="middle">
+    ${label.replace(/[<>&'"]/g, '')}
+  </text>
+</svg>`;
 
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Cache-Control', 'public, max-age=60');
-    return res.status(200).send(Buffer.from(arrayBuffer));
+    res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).send(svg);
   } catch (error) {
     return next(error);
   }

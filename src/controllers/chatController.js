@@ -59,28 +59,56 @@ export const saveSession = async (req, res, next) => {
   try {
     const { sessionId, name, messages, metadata = {} } = req.body;
 
-    // Check if session exists
-    let session = await Chat.findOne({
-      user: req.user.id,
-      sessionId
-    });
+    const safeSessionId =
+      typeof sessionId === 'string' && sessionId.trim()
+        ? sessionId.trim()
+        : `${Date.now()}`;
 
-    if (session) {
-      // Update existing session
-      session.name = name;
-      session.messages = messages;
-      session.metadata = { ...session.metadata, ...metadata };
-      await session.save();
-    } else {
-      // Create new session
-      session = await Chat.create({
-        user: req.user.id,
-        sessionId,
-        name,
-        messages,
-        metadata
-      });
-    }
+    const safeName =
+      typeof name === 'string' && name.trim()
+        ? name.trim().slice(0, 100)
+        : 'Chat';
+
+    const safeMessages = Array.isArray(messages)
+      ? messages
+          .map((msg) => {
+            const sender = msg?.sender === 'user' ? 'user' : msg?.sender === 'ai' ? 'ai' : null;
+            const text = typeof msg?.text === 'string' ? msg.text.trim() : '';
+            if (!sender || !text) return null;
+            return {
+              text,
+              sender,
+              timestamp: msg?.timestamp || new Date().toISOString()
+            };
+          })
+          .filter(Boolean)
+      : [];
+
+    const derivedLastMessage =
+      safeMessages.length > 0
+        ? safeMessages[safeMessages.length - 1].text.slice(0, 50)
+        : '';
+
+    const safeMetadata = {
+      ...(metadata && typeof metadata === 'object' ? metadata : {}),
+      lastMessage:
+        typeof metadata?.lastMessage === 'string'
+          ? metadata.lastMessage.slice(0, 200)
+          : derivedLastMessage,
+      messageCount: safeMessages.length
+    };
+
+    const session = await Chat.findOneAndUpdate(
+      { user: req.user.id, sessionId: safeSessionId },
+      {
+        $set: {
+          name: safeName,
+          messages: safeMessages,
+          metadata: safeMetadata
+        }
+      },
+      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
+    );
 
     res.status(200).json({
       success: true,
