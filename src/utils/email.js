@@ -212,6 +212,65 @@ const buildVerifyEmailHtml = ({ name, verifyUrl }) => {
 </html>`;
 };
 
+const buildWelcomeHtml = ({ name, websiteUrl }) => {
+  const safeName = escapeHtml(name || 'there');
+  const safeWebsiteUrl = escapeHtml(websiteUrl || 'https://www.funclexa.me');
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Welcome to FuncLexa</title>
+  </head>
+  <body style="margin:0;padding:0;background:#070b14;font-family:Arial,sans-serif;color:#eaf2ff;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;background:#070b14;">
+      <tr>
+        <td align="center">
+          <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#0f1728;border:1px solid #1e2b45;border-radius:16px;overflow:hidden;">
+            <tr>
+              <td style="padding:28px 28px 18px 28px;background:linear-gradient(90deg,#00e5ff,#8b5cf6);">
+                <h1 style="margin:0;font-size:28px;line-height:1.2;color:#ffffff;">FuncLexa</h1>
+                <p style="margin:8px 0 0 0;color:#f6f8ff;font-size:14px;">Build. Learn. Create.</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px;">
+                <h2 style="margin:0 0 12px 0;font-size:22px;color:#ffffff;">Welcome to the FuncLexa family, ${safeName}</h2>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.7;color:#cbd5e1;">
+                  We are truly grateful to have you here. FuncLexa was built to help creators and developers turn ideas into real products.
+                </p>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.7;color:#cbd5e1;">
+                  Whether you are exploring AI tools, building projects, or learning faster, we are with you on every step.
+                </p>
+                <p style="margin:0 0 20px 0;font-size:15px;line-height:1.7;color:#cbd5e1;">
+                  Thank you for trusting us. Your support means everything.
+                </p>
+
+                <a href="${safeWebsiteUrl}"
+                   style="display:inline-block;padding:12px 18px;border-radius:10px;background:linear-gradient(90deg,#00e5ff,#8b5cf6);color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;">
+                  Visit FuncLexa
+                </a>
+
+                <p style="margin:20px 0 0 0;font-size:13px;color:#94a3b8;">
+                  Website: <a href="${safeWebsiteUrl}" style="color:#00e5ff;text-decoration:none;">www.funclexa.me</a>
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 28px 24px 28px;border-top:1px solid #1e2b45;color:#94a3b8;font-size:12px;line-height:1.6;">
+                With gratitude,<br/>
+                Team FuncLexa
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+};
+
 export const sendPasswordResetEmail = async ({ to, name, resetUrl }) => {
   const subject = 'Reset your FuncLexa password';
   const text = [
@@ -417,6 +476,88 @@ export const sendSignupOtpEmail = async ({ to, name, otp }) => {
     </table>
   </body>
 </html>`;
+
+  const isProduction = process.env.NODE_ENV === 'production';
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const resendFrom = process.env.RESEND_FROM || process.env.EMAIL_FROM;
+  if (resendApiKey && resendFrom) {
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: resendFrom,
+          to: [to],
+          subject,
+          text,
+          html
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Resend failed: ${response.status} ${errorText}`);
+      }
+
+      return { delivered: true };
+    } catch (error) {
+      if (isProduction) {
+        throw error;
+      }
+      console.error('Resend delivery failed, falling back to SMTP:', error?.message || error);
+    }
+  }
+
+  const transport = getTransport();
+  if (!transport) {
+    return { delivered: false, reason: 'No email provider configured' };
+  }
+
+  const from =
+    process.env.SMTP_FROM ||
+    process.env.EMAIL_FROM ||
+    process.env.SMTP_USER ||
+    process.env.EMAIL_USER;
+
+  const sendResult = await Promise.race([
+    transport.sendMail({
+      from,
+      to,
+      subject,
+      text,
+      html
+    }),
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('SMTP send timeout')), 15000);
+    })
+  ]);
+
+  if (!sendResult) {
+    throw new Error('SMTP send failed');
+  }
+
+  return { delivered: true };
+};
+
+export const sendWelcomeEmail = async ({ to, name }) => {
+  const websiteUrl = normalizeUrl(process.env.WEBSITE_URL) || 'https://www.funclexa.me';
+  const subject = 'Welcome to FuncLexa, built for creators like you';
+  const text = [
+    `Hi ${name || 'there'},`,
+    '',
+    'Welcome to FuncLexa.',
+    'We are truly grateful to have you here.',
+    'Your support means everything to us.',
+    '',
+    `Visit us: ${websiteUrl}`,
+    '',
+    'With gratitude,',
+    'Team FuncLexa'
+  ].join('\n');
+  const html = buildWelcomeHtml({ name, websiteUrl });
 
   const isProduction = process.env.NODE_ENV === 'production';
   const resendApiKey = process.env.RESEND_API_KEY;

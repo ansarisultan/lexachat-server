@@ -8,7 +8,8 @@ import {
   buildVerifyEmailUrl,
   sendPasswordResetEmail,
   sendEmailVerificationEmail,
-  sendSignupOtpEmail
+  sendSignupOtpEmail,
+  sendWelcomeEmail
 } from '../utils/email.js';
 
 // Generate JWT Token
@@ -64,6 +65,11 @@ export const signup = async (req, res, next) => {
       }
     });
     await SignupOtp.deleteOne({ email });
+
+    // Send welcome email in background so signup response stays fast.
+    void sendWelcomeEmail({ to: email, name }).catch((welcomeError) => {
+      console.error('Welcome email failed:', welcomeError?.message || welcomeError);
+    });
 
     return res.status(201).json({
       success: true,
