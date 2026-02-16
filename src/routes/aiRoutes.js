@@ -1,7 +1,7 @@
 import express from 'express';
 import { body } from 'express-validator';
 import { validate } from '../middleware/validateMiddleware.js';
-import { chatCompletion } from '../controllers/aiController.js';
+import { chatCompletion, generateImage } from '../controllers/aiController.js';
 
 const router = express.Router();
 
@@ -14,5 +14,7 @@ router.post(
   validate,
   chatCompletion
 );
+
+router.get('/image', generateImage);
 
 export default router;

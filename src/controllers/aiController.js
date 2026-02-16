@@ -306,3 +306,39 @@ export const chatCompletion = async (req, res, next) => {
     return next(error);
   }
 };
+
+export const generateImage = async (req, res, next) => {
+  try {
+    const prompt = String(req.query.prompt || '').trim();
+    if (!prompt) {
+      return next(new AppError('prompt is required', 400));
+    }
+
+    const seed = Number.parseInt(String(req.query.seed || Date.now()), 10);
+    const width = Math.min(1024, Math.max(256, Number.parseInt(String(req.query.w || 1024), 10) || 1024));
+    const height = Math.min(1024, Math.max(256, Number.parseInt(String(req.query.h || 1024), 10) || 1024));
+    const safePrompt = encodeURIComponent(prompt);
+    const sourceUrl = `https://image.pollinations.ai/prompt/${safePrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true&safe=true`;
+
+    const upstream = await fetch(sourceUrl, {
+      method: 'GET',
+      headers: {
+        Accept: 'image/*'
+      }
+    });
+
+    if (!upstream.ok) {
+      const upstreamError = await upstream.text().catch(() => '');
+      return next(new AppError(`Image provider error ${upstream.status}: ${upstreamError || 'Unknown'}`, 502));
+    }
+
+    const arrayBuffer = await upstream.arrayBuffer();
+    const contentType = upstream.headers.get('content-type') || 'image/jpeg';
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=60');
+    return res.status(200).send(Buffer.from(arrayBuffer));
+  } catch (error) {
+    return next(error);
+  }
+};
