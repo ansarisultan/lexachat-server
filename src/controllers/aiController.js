@@ -320,9 +320,8 @@ export const generateImage = async (req, res, next) => {
     const safePrompt = encodeURIComponent(prompt);
 
     const providers = [
-      `https://image.pollinations.ai/prompt/${safePrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true&safe=true`,
-      `https://source.unsplash.com/featured/${width}x${height}?${safePrompt}`,
-      `https://picsum.photos/seed/${encodeURIComponent(`${prompt}-${seed}`)}/${width}/${height}`
+      `https://image.pollinations.ai/prompt/${safePrompt}?model=flux&width=${width}&height=${height}&seed=${seed}&nologo=true&safe=true`,
+      `https://image.pollinations.ai/prompt/${safePrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true&safe=true`
     ];
 
     for (const sourceUrl of providers) {
