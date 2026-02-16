@@ -5,6 +5,7 @@ import {
   login, 
   logout, 
   getMe,
+  updateProfile,
   updatePreferences,
   changePassword,
   forgotPassword,
@@ -131,6 +132,22 @@ const sendLoginVerificationOtpValidation = [
     .toLowerCase()
 ];
 
+const updateProfileValidation = [
+  body('name')
+    .optional()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Name must be between 2 and 50 characters')
+    .trim(),
+  body('avatar')
+    .optional()
+    .isString()
+    .withMessage('Avatar must be a string'),
+  body('bio')
+    .optional()
+    .isLength({ max: 280 })
+    .withMessage('Bio cannot exceed 280 characters')
+];
+
 const verifyLoginVerificationOtpValidation = [
   body('email')
     .isEmail()
@@ -159,6 +176,7 @@ router.post('/verify-login-verification-otp', requireDatabase, verifyLoginVerifi
 // Protected routes
 router.get('/me', requireDatabase, protect, getMe);
 router.post('/logout', requireDatabase, protect, logout);
+router.patch('/profile', requireDatabase, protect, updateProfileValidation, validate, updateProfile);
 router.patch('/preferences', requireDatabase, protect, updatePreferences);
 router.patch('/change-password', requireDatabase, protect, changePasswordValidation, validate, changePassword);
 

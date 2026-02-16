@@ -51,6 +51,18 @@ const userSchema = new mongoose.Schema({
     enum: ['user', 'admin'],
     default: 'user'
   },
+  avatar: {
+    type: String,
+    default: '',
+    trim: true,
+    maxlength: [500000, 'Avatar data is too large']
+  },
+  bio: {
+    type: String,
+    default: '',
+    trim: true,
+    maxlength: [280, 'Bio cannot exceed 280 characters']
+  },
   preferences: {
     theme: {
       type: String,

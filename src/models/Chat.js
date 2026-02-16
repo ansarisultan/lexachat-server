@@ -1,6 +1,10 @@
 import mongoose from 'mongoose';
 
 const messageSchema = new mongoose.Schema({
+  id: {
+    type: String,
+    default: ''
+  },
   text: {
     type: String,
     required: true,
@@ -14,6 +18,29 @@ const messageSchema = new mongoose.Schema({
   timestamp: {
     type: Date,
     default: Date.now
+  },
+  parentUserMessageId: {
+    type: String,
+    default: ''
+  },
+  activeVersion: {
+    type: Number,
+    default: 0
+  },
+  formatHint: {
+    type: String,
+    default: ''
+  },
+  versions: [
+    {
+      id: { type: String, default: '' },
+      text: { type: String, default: '' },
+      timestamp: { type: Date, default: Date.now }
+    }
+  ],
+  requestedFormat: {
+    type: String,
+    default: ''
   }
 }, { _id: true });
 

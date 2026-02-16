@@ -215,12 +215,16 @@ export const login = async (req, res, next) => {
       return next(new AppError('Please verify your email before logging in.', 403));
     }
 
-    // Update last login
-    user.lastLogin = new Date();
-    await user.save({ validateBeforeSave: false });
-
-    // Send response
+    // Send response first for faster perceived login.
     createSendToken(user, 200, res);
+
+    // Update last login in background (non-blocking).
+    void User.updateOne(
+      { _id: user._id },
+      { $set: { lastLogin: new Date() } }
+    ).catch((updateError) => {
+      console.error('Failed to update lastLogin:', updateError);
+    });
 
   } catch (error) {
     next(error);
@@ -378,6 +382,47 @@ export const logout = async (req, res, next) => {
 export const getMe = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        user
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update profile info
+// @route   PATCH /api/auth/profile
+// @access  Private
+export const updateProfile = async (req, res, next) => {
+  try {
+    const { name, avatar, bio } = req.body;
+
+    const updates = {};
+    if (typeof name === 'string') {
+      const cleaned = name.trim();
+      if (cleaned.length < 2 || cleaned.length > 50) {
+        return next(new AppError('Name must be between 2 and 50 characters', 400));
+      }
+      updates.name = cleaned;
+    }
+
+    if (typeof avatar === 'string') {
+      updates.avatar = avatar.trim();
+    }
+
+    if (typeof bio === 'string') {
+      updates.bio = bio.trim();
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
 
     res.status(200).json({
       success: true,
