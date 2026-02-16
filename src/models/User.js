@@ -55,7 +55,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: '',
     trim: true,
-    maxlength: [500000, 'Avatar data is too large']
+    maxlength: [2500000, 'Avatar data is too large']
   },
   bio: {
     type: String,

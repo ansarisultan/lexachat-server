@@ -141,7 +141,9 @@ const updateProfileValidation = [
   body('avatar')
     .optional()
     .isString()
-    .withMessage('Avatar must be a string'),
+    .withMessage('Avatar must be a string')
+    .isLength({ max: 2500000 })
+    .withMessage('Avatar data is too large'),
   body('bio')
     .optional()
     .isLength({ max: 280 })
