@@ -4,12 +4,15 @@ const GROQ_API_URL =
   process.env.GROQ_API_URL ||
   process.env.VITE_GROQ_API_URL ||
   'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'meta-llama/llama-4-maverick-17b-128e-instruct';
+const GENERAL_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+const CODING_MODEL = 'meta-llama/llama-4-maverick-17b-128e-instruct';
 const TAVILY_API_URL = 'https://api.tavily.com/search';
 const SERPER_API_URL = 'https://google.serper.dev/search';
 
 const SEARCH_INTENT_REGEX =
   /\b(search|find|look\s*up|google|latest|today|news|current|real[-\s]?time|updated?)\b/i;
+const CODE_INTENT_REGEX =
+  /(```|`[^`]+`|\b(code|coding|debug|bug|error|stack trace|exception|refactor|optimiz(e|ation)|algorithm|complexity|regex|sql|query|api|endpoint|function|class|typescript|javascript|python|java|c\+\+|react|node|express|mongodb)\b)/i;
 
 const getUserTextFromContent = (content) => {
   if (typeof content === 'string') return content;
@@ -40,6 +43,12 @@ const needsRealtimeSearch = (messages = []) => {
   const lastUserText = getLastUserMessageText(messages);
   if (!lastUserText) return false;
   return SEARCH_INTENT_REGEX.test(lastUserText);
+};
+
+const selectModelForMessages = (messages = []) => {
+  const lastUserText = getLastUserMessageText(messages);
+  if (!lastUserText) return GENERAL_MODEL;
+  return CODE_INTENT_REGEX.test(lastUserText) ? CODING_MODEL : GENERAL_MODEL;
 };
 
 const searchWithTavily = async (query, apiKey) => {
@@ -242,8 +251,9 @@ export const chatCompletion = async (req, res, next) => {
       }
     }
 
+    const selectedModel = selectModelForMessages(messages);
     const payload = {
-      model: GROQ_MODEL,
+      model: selectedModel,
       messages: messagesForModel,
       temperature: 0.7,
       max_tokens: 2048,
@@ -288,7 +298,7 @@ export const chatCompletion = async (req, res, next) => {
       success: true,
       data: {
         content,
-        model: GROQ_MODEL,
+        model: selectedModel,
         webSearch: webSearch
           ? {
               used: true,
