@@ -4,7 +4,7 @@ const GROQ_API_URL =
   process.env.GROQ_API_URL ||
   process.env.VITE_GROQ_API_URL ||
   'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+const GROQ_MODEL = 'meta-llama/llama-4-maverick-17b-128e-instruct';
 const TAVILY_API_URL = 'https://api.tavily.com/search';
 const SERPER_API_URL = 'https://google.serper.dev/search';
 

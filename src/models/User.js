@@ -66,8 +66,8 @@ const userSchema = new mongoose.Schema({
   preferences: {
     theme: {
       type: String,
-      enum: ['dark', 'light'],
-      default: 'dark'
+      enum: ['cyber', 'light', 'dark'],
+      default: 'cyber'
     },
     defaultMode: {
       type: String,

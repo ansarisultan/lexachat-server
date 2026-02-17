@@ -60,7 +60,7 @@ export const signup = async (req, res, next) => {
       password,
       emailVerified: true,
       preferences: {
-        theme: 'dark',
+        theme: 'cyber',
         defaultMode: 'session'
       }
     });
@@ -447,12 +447,13 @@ export const updateProfile = async (req, res, next) => {
 export const updatePreferences = async (req, res, next) => {
   try {
     const { theme, defaultMode } = req.body;
+    const normalizedTheme = theme === 'dark' ? 'cyber' : theme;
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
       {
         preferences: {
-          theme: theme || req.user.preferences.theme,
+          theme: normalizedTheme || req.user.preferences.theme,
           defaultMode: defaultMode || req.user.preferences.defaultMode
         }
       },
