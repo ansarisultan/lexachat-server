@@ -6,6 +6,7 @@ const GROQ_API_URL =
   'https://api.groq.com/openai/v1/chat/completions';
 const GENERAL_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 const CODING_MODEL = 'meta-llama/llama-4-maverick-17b-128e-instruct';
+const META_FALLBACK_MODEL = 'openai/gpt-oss-120b';
 const TAVILY_API_URL = 'https://api.tavily.com/search';
 const SERPER_API_URL = 'https://google.serper.dev/search';
 
@@ -50,6 +51,8 @@ const selectModelForMessages = (messages = []) => {
   if (!lastUserText) return GENERAL_MODEL;
   return CODE_INTENT_REGEX.test(lastUserText) ? CODING_MODEL : GENERAL_MODEL;
 };
+
+const isMetaModel = (model = '') => /^meta[-/]/i.test(model);
 
 const searchWithTavily = async (query, apiKey) => {
   const response = await fetch(TAVILY_API_URL, {
@@ -259,22 +262,41 @@ export const chatCompletion = async (req, res, next) => {
       max_tokens: 2048,
       stream: false
     };
+    const requestModel = async (model) => {
+      const response = await fetch(GROQ_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          ...payload,
+          model
+        })
+      });
 
-    const response = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify(payload)
-    });
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          ok: false,
+          error: `Groq API error ${response.status}: ${errorText}`
+        };
+      }
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      return next(new AppError(`Groq API error ${response.status}: ${errorText}`, 502));
+      const data = await response.json();
+      return { ok: true, data, model };
+    };
+
+    let result = await requestModel(selectedModel);
+    if (!result.ok && isMetaModel(selectedModel)) {
+      result = await requestModel(META_FALLBACK_MODEL);
     }
 
-    const data = await response.json();
+    if (!result.ok) {
+      return next(new AppError(result.error, 502));
+    }
+
+    const { data } = result;
     let content = data?.choices?.[0]?.message?.content;
     if (!content) {
       return next(new AppError('Invalid Groq API response format', 502));
@@ -298,7 +320,7 @@ export const chatCompletion = async (req, res, next) => {
       success: true,
       data: {
         content,
-        model: selectedModel,
+        model: result.model,
         webSearch: webSearch
           ? {
               used: true,
