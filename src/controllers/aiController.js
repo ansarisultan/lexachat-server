@@ -54,6 +54,35 @@ const selectModelForMessages = (messages = []) => {
 
 const isMetaModel = (model = '') => /^meta[-/]/i.test(model);
 
+const STATIC_FAQ_RESPONSES = [
+  {
+    match: /\b(who\s+created\s+you|who\s+made\s+you|who\s+built\s+you|your\s+creator|your\s+founder)\b/i,
+    content:
+      'I was created by Sultan Salauddin Ansari, a Computer Science Engineering student at Presidency University, Bengaluru, and the builder behind the FuncLexa AI ecosystem. LexaChat is part of his vision to develop fast, reliable, and developer-focused AI tools for real-world productivity.'
+  },
+  {
+    match: /\b(about\s+funclexa|what\s+is\s+funclexa|tell\s+me\s+about\s+funclexa)\b/i,
+    content:
+      'FuncLexa is an AI-driven SaaS ecosystem focused on building intelligent, practical tools for developers, students, and modern digital workflows. The platform combines full-stack engineering, voice AI, and applied artificial intelligence to deliver real-world productivity solutions. LexaChat serves as one of the flagship products within the FuncLexa ecosystem.'
+  },
+  {
+    match: /\b(about\s+creator|about\s+the\s+creator|who\s+is\s+the\s+creator|about\s+sultan)\b/i,
+    content:
+      'Sultan Salauddin Ansari is a B.Tech Computer Science Engineering student at Presidency University, Bengaluru, and an aspiring AI Engineer and MERN stack developer. He specializes in building production-ready full-stack applications and applied AI systems. His key work includes the FuncLexa ecosystem, the LexaChat real-time AI platform, and an advanced AI voice assistant, all focused on solving real-world problems through modern web technologies.'
+  },
+  {
+    match: /\b(about\s+lexachat|what\s+is\s+lexachat|tell\s+me\s+about\s+lexachat)\b/i,
+    content:
+      'LexaChat is a developer-focused AI chat assistant built under the FuncLexa ecosystem. It is designed to provide fast, accurate, and context-aware assistance for coding, debugging, learning, and real-world productivity. Built with modern full-stack technologies and advanced AI integration, LexaChat aims to deliver a smooth, reliable, and intelligent chat experience for developers and tech enthusiasts.'
+  }
+];
+
+const getStaticFaqResponse = (text = '') => {
+  if (!text) return null;
+  const match = STATIC_FAQ_RESPONSES.find((entry) => entry.match.test(text));
+  return match ? match.content : null;
+};
+
 const searchWithTavily = async (query, apiKey) => {
   const response = await fetch(TAVILY_API_URL, {
     method: 'POST',
@@ -230,6 +259,21 @@ export const chatCompletion = async (req, res, next) => {
     }
 
     const lastUserText = getLastUserMessageText(messages);
+    const staticReply = getStaticFaqResponse(lastUserText);
+    if (staticReply) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          content: staticReply,
+          model: 'static',
+          webSearch: {
+            used: false,
+            provider: null,
+            sources: []
+          }
+        }
+      });
+    }
     const shouldSearch = Boolean(webSearchEnabled) && needsRealtimeSearch(messages);
     let webSearch = null;
     let messagesForModel = messages;
