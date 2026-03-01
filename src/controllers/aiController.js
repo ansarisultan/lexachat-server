@@ -383,82 +383,83 @@ export const chatCompletion = async (req, res, next) => {
   }
 };
 
-export const generateImage = async (req, res, next) => {
-  try {
-    const prompt = String(req.query.prompt || '').trim();
-    if (!prompt) {
-      return next(new AppError('prompt is required', 400));
-    }
-
-    const seed = Number.parseInt(String(req.query.seed || Date.now()), 10);
-    const width = Math.min(1024, Math.max(256, Number.parseInt(String(req.query.w || 1024), 10) || 1024));
-    const height = Math.min(1024, Math.max(256, Number.parseInt(String(req.query.h || 1024), 10) || 1024));
-    const safePrompt = encodeURIComponent(prompt);
-
-    const providers = [
-      (s) => `https://image.pollinations.ai/prompt/${safePrompt}?model=flux&width=${width}&height=${height}&seed=${s}&nologo=true&safe=true`,
-      (s) => `https://image.pollinations.ai/prompt/${safePrompt}?model=turbo&width=${width}&height=${height}&seed=${s}&nologo=true&safe=true`,
-      (s) => `https://image.pollinations.ai/prompt/${safePrompt}?width=${width}&height=${height}&seed=${s}&nologo=true&safe=true`
-    ];
-
-    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-    for (const buildUrl of providers) {
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        const attemptSeed = seed + attempt;
-        const sourceUrl = buildUrl(attemptSeed);
-        try {
-          const upstream = await fetch(sourceUrl, {
-            method: 'GET',
-            headers: {
-              Accept: 'image/*',
-              'User-Agent': 'FuncLexaImageProxy/1.0'
-            }
-          });
-
-          if (!upstream.ok) {
-            await sleep(250 * (attempt + 1));
-            continue;
-          }
-
-          const arrayBuffer = await upstream.arrayBuffer();
-          const contentType = upstream.headers.get('content-type') || 'image/jpeg';
-
-          res.setHeader('Content-Type', contentType);
-          res.setHeader('Cache-Control', 'public, max-age=60');
-          return res.status(200).send(Buffer.from(arrayBuffer));
-        } catch {
-          await sleep(250 * (attempt + 1));
-        }
-      }
-    }
-
-    // Final fallback: always return a valid SVG image instead of failing with 500/502.
-    const label = prompt.length > 80 ? `${prompt.slice(0, 77)}...` : prompt;
-    const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0f172a"/>
-      <stop offset="100%" stop-color="#1d4ed8"/>
-    </linearGradient>
-  </defs>
-  <rect width="100%" height="100%" fill="url(#bg)" />
-  <text x="50%" y="45%" fill="#e2e8f0" font-family="Arial, sans-serif" font-size="28" text-anchor="middle">
-    Image service is busy
-  </text>
-  <text x="50%" y="53%" fill="#93c5fd" font-family="Arial, sans-serif" font-size="18" text-anchor="middle">
-    Prompt:
-  </text>
-  <text x="50%" y="59%" fill="#cbd5e1" font-family="Arial, sans-serif" font-size="18" text-anchor="middle">
-    ${label.replace(/[<>&'"]/g, '')}
-  </text>
-</svg>`;
-
-    res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-store');
-    return res.status(200).send(svg);
-  } catch (error) {
-    return next(error);
-  }
-};
+// Image generation endpoint/controller disabled.
+// export const generateImage = async (req, res, next) => {
+//   try {
+//     const prompt = String(req.query.prompt || '').trim();
+//     if (!prompt) {
+//       return next(new AppError('prompt is required', 400));
+//     }
+//
+//     const seed = Number.parseInt(String(req.query.seed || Date.now()), 10);
+//     const width = Math.min(1024, Math.max(256, Number.parseInt(String(req.query.w || 1024), 10) || 1024));
+//     const height = Math.min(1024, Math.max(256, Number.parseInt(String(req.query.h || 1024), 10) || 1024));
+//     const safePrompt = encodeURIComponent(prompt);
+//
+//     const providers = [
+//       (s) => `https://image.pollinations.ai/prompt/${safePrompt}?model=flux&width=${width}&height=${height}&seed=${s}&nologo=true&safe=true`,
+//       (s) => `https://image.pollinations.ai/prompt/${safePrompt}?model=turbo&width=${width}&height=${height}&seed=${s}&nologo=true&safe=true`,
+//       (s) => `https://image.pollinations.ai/prompt/${safePrompt}?width=${width}&height=${height}&seed=${s}&nologo=true&safe=true`
+//     ];
+//
+//     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+//
+//     for (const buildUrl of providers) {
+//       for (let attempt = 0; attempt < 3; attempt += 1) {
+//         const attemptSeed = seed + attempt;
+//         const sourceUrl = buildUrl(attemptSeed);
+//         try {
+//           const upstream = await fetch(sourceUrl, {
+//             method: 'GET',
+//             headers: {
+//               Accept: 'image/*',
+//               'User-Agent': 'FuncLexaImageProxy/1.0'
+//             }
+//           });
+//
+//           if (!upstream.ok) {
+//             await sleep(250 * (attempt + 1));
+//             continue;
+//           }
+//
+//           const arrayBuffer = await upstream.arrayBuffer();
+//           const contentType = upstream.headers.get('content-type') || 'image/jpeg';
+//
+//           res.setHeader('Content-Type', contentType);
+//           res.setHeader('Cache-Control', 'public, max-age=60');
+//           return res.status(200).send(Buffer.from(arrayBuffer));
+//         } catch {
+//           await sleep(250 * (attempt + 1));
+//         }
+//       }
+//     }
+//
+//     // Final fallback: always return a valid SVG image instead of failing with 500/502.
+//     const label = prompt.length > 80 ? `${prompt.slice(0, 77)}...` : prompt;
+//     const svg = `<?xml version="1.0" encoding="UTF-8"?>
+// <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+//   <defs>
+//     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+//       <stop offset="0%" stop-color="#0f172a"/>
+//       <stop offset="100%" stop-color="#1d4ed8"/>
+//     </linearGradient>
+//   </defs>
+//   <rect width="100%" height="100%" fill="url(#bg)" />
+//   <text x="50%" y="45%" fill="#e2e8f0" font-family="Arial, sans-serif" font-size="28" text-anchor="middle">
+//     Image service is busy
+//   </text>
+//   <text x="50%" y="53%" fill="#93c5fd" font-family="Arial, sans-serif" font-size="18" text-anchor="middle">
+//     Prompt:
+//   </text>
+//   <text x="50%" y="59%" fill="#cbd5e1" font-family="Arial, sans-serif" font-size="18" text-anchor="middle">
+//     ${label.replace(/[<>&'"]/g, '')}
+//   </text>
+// </svg>`;
+//
+//     res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+//     res.setHeader('Cache-Control', 'no-store');
+//     return res.status(200).send(svg);
+//   } catch (error) {
+//     return next(error);
+//   }
+// };

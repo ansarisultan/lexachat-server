@@ -1,7 +1,8 @@
 import express from 'express';
 import { body } from 'express-validator';
 import { validate } from '../middleware/validateMiddleware.js';
-import { chatCompletion, generateImage } from '../controllers/aiController.js';
+import { chatCompletion } from '../controllers/aiController.js';
+// import { generateImage } from '../controllers/aiController.js';
 
 const router = express.Router();
 
@@ -15,6 +16,7 @@ router.post(
   chatCompletion
 );
 
-router.get('/image', generateImage);
+// Image generation endpoint disabled.
+// router.get('/image', generateImage);
 
 export default router;
