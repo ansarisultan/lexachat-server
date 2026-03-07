@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs';
+import path from 'path';
 import authRoutes from './routes/authRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
@@ -31,9 +33,11 @@ if (clientUrls) {
 
 const corsOptions = {
   origin: (origin, callback) => {
+    const isDesktopOrigin = origin === 'null' || origin?.startsWith('file://');
+
     // Allow non-browser clients (Postman/curl) and configured browser origins.
-    if (!origin || allowedOrigins.has(origin)) {
-      return callback(null, origin);
+    if (!origin || isDesktopOrigin || allowedOrigins.has(origin)) {
+      return callback(null, true);
     }
 
     return callback(new Error(`Origin not allowed by CORS: ${origin}`));
@@ -54,6 +58,14 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/ai', aiRoutes);
+
+const electronStaticDir = process.env.ELECTRON_STATIC_DIR;
+if (electronStaticDir && fs.existsSync(electronStaticDir)) {
+  app.use(express.static(electronStaticDir));
+  app.get(/^(?!\/api).*/, (_req, res) => {
+    res.sendFile(path.join(electronStaticDir, 'index.html'));
+  });
+}
 
 app.use(notFound);
 app.use(errorHandler);
