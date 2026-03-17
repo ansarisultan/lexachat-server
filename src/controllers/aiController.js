@@ -4,12 +4,10 @@ const GROQ_API_URL =
   process.env.GROQ_API_URL ||
   process.env.VITE_GROQ_API_URL ||
   'https://api.groq.com/openai/v1/chat/completions';
-const GENERAL_MODEL = 'llama-3.1-8b-instant';
-const STRONG_FALLBACK_MODEL = 'llama-3.3-70b-versatile';
+const GENERAL_MODEL = 'llama-3.3-70b-versatile';
+const STRONG_FALLBACK_MODEL = 'openai/gpt-oss-120b';
 const REASONING_MODEL = 'openai/gpt-oss-120b';
-const REASONING_ALTERNATIVE_MODEL = 'moonshotai/kimi-k2-instruct-0905';
 const CODING_MODEL = 'qwen/qwen3-32b';
-const VISION_MODEL = 'meta/llama-3.2-90b-vision-instruct';
 const TAVILY_API_URL = 'https://api.tavily.com/search';
 const SERPER_API_URL = 'https://google.serper.dev/search';
 
@@ -19,6 +17,103 @@ const CODE_INTENT_REGEX =
   /(```|`[^`]+`|\b(code|coding|debug|bug|error|stack trace|exception|refactor|optimiz(e|ation)|algorithm|complexity|regex|sql|query|api|endpoint|function|class|typescript|javascript|python|java|c\+\+|react|node|express|mongodb)\b)/i;
 const REASONING_INTENT_REGEX =
   /\b(reason|reasoning|analy[sz]e|analysis|think\s+step|step[-\s]?by[-\s]?step|complex|deep|carefully|compare|trade[\s-]?off|pros?\s+and\s+cons|why|explain\s+in\s+detail|detailed)\b/i;
+
+const GENERAL_RESPONSE_SYSTEM_PROMPT = `You are LexaChat, a premium AI assistant focused on answer quality.
+
+Your priority is to give the user the best possible response, not the fastest-looking one.
+
+Core behavior:
+- understand the exact user intent before answering
+- answer directly, accurately, and with strong relevance to the prompt
+- give the most useful result first
+- prefer clarity, substance, and correctness over filler
+- avoid vague, generic, or repetitive wording
+
+Presentation:
+- make responses attractive and easy to scan
+- use short sections only when they improve readability
+- use highlighted markdown bullets for key points when helpful
+- use concise emphasis for important ideas
+- keep formatting clean and professional
+
+Rules:
+- do not add unnecessary introductions or endings
+- do not overexplain simple things
+- if the user asks for detail, give depth with structure
+- if the user asks for a short answer, keep it compact
+- if information is uncertain, say so clearly instead of bluffing
+- do not include unnecessary safety-style filler or repeated disclaimers`;
+
+const CODING_RESPONSE_SYSTEM_PROMPT = `You are LexaChat, a premium coding and debugging assistant.
+
+Your priority is to produce the best quality technical answer with strong correctness, relevance, and formatting judgment.
+
+Core behavior:
+- solve the user's exact problem first
+- identify the real cause when debugging, not just surface symptoms
+- recommend the best fix first when multiple options exist
+- keep explanations practical, technically accurate, and implementation-focused
+
+Formatting rules:
+- do not put everything in code fences
+- use code blocks only for code, commands, config, queries, or exact syntax
+- prefer a short explanation before code when that improves understanding
+- if code is not necessary, answer in plain text
+- if code is necessary, provide clean and complete snippets
+
+Response quality:
+- avoid fluff, repetition, and generic advice
+- avoid unnecessary theory unless the user asks for it
+- when debugging, structure as cause, fix, and final answer
+- when comparing solutions, clearly state the recommended approach
+- keep the response attractive, concise, and highly useful`;
+
+const normalizeStoredMemory = (memory = {}) => ({
+  preferredName: typeof memory?.preferredName === 'string' ? memory.preferredName.trim() : '',
+  responseTone: typeof memory?.responseTone === 'string' ? memory.responseTone.trim() : '',
+  customPrompt: typeof memory?.customPrompt === 'string' ? memory.customPrompt.trim() : '',
+  savedMemories: Array.isArray(memory?.savedMemories)
+    ? memory.savedMemories
+        .filter((item) => typeof item === 'string' && item.trim())
+        .map((item) => item.trim())
+    : []
+});
+
+const buildUserMemoryPrompt = (memory = {}, fallbackName = '') => {
+  const normalized = normalizeStoredMemory(memory);
+  const sections = [];
+
+  if (normalized.preferredName) {
+    sections.push(`Address the user as: ${normalized.preferredName}`);
+  } else if (fallbackName) {
+    sections.push(`User account name: ${fallbackName}`);
+  }
+
+  if (normalized.responseTone) {
+    sections.push(`Preferred response tone: ${normalized.responseTone}`);
+  }
+
+  if (normalized.customPrompt) {
+    sections.push(`Persistent user instruction: ${normalized.customPrompt}`);
+  }
+
+  if (normalized.savedMemories.length > 0) {
+    sections.push(
+      `Saved user memory facts:\n${normalized.savedMemories.map((item, index) => `${index + 1}. ${item}`).join('\n')}`
+    );
+  }
+
+  if (sections.length === 0) return '';
+
+  return [
+    'Personalization memory for this authenticated user:',
+    '- This memory is user-approved persistent profile data.',
+    '- Use it only when it improves the response.',
+    '- Do not mention the memory unless it is relevant.',
+    '- If the current user message conflicts with saved memory, follow the current message.',
+    ...sections
+  ].join('\n');
+};
 
 const getUserTextFromContent = (content) => {
   if (typeof content === 'string') return content;
@@ -59,7 +154,7 @@ const needsRealtimeSearch = (messages = []) => {
 
 const selectModelForMessages = (messages = []) => {
   const lastUserText = getLastUserMessageText(messages);
-  if (hasImageContent(messages)) return VISION_MODEL;
+  if (hasImageContent(messages)) return GENERAL_MODEL;
   if (!lastUserText) return GENERAL_MODEL;
   if (CODE_INTENT_REGEX.test(lastUserText)) return CODING_MODEL;
   if (REASONING_INTENT_REGEX.test(lastUserText) || lastUserText.length > 900) return REASONING_MODEL;
@@ -69,15 +164,13 @@ const selectModelForMessages = (messages = []) => {
 const getFallbackChainForModel = (model = '') => {
   switch (model) {
     case GENERAL_MODEL:
-      return [STRONG_FALLBACK_MODEL, REASONING_ALTERNATIVE_MODEL];
+      return [STRONG_FALLBACK_MODEL];
     case CODING_MODEL:
-      return [STRONG_FALLBACK_MODEL, REASONING_ALTERNATIVE_MODEL];
-    case VISION_MODEL:
       return [STRONG_FALLBACK_MODEL];
     case REASONING_MODEL:
-      return [REASONING_ALTERNATIVE_MODEL, STRONG_FALLBACK_MODEL];
+      return [];
     default:
-      return [STRONG_FALLBACK_MODEL, REASONING_ALTERNATIVE_MODEL];
+      return [STRONG_FALLBACK_MODEL];
   }
 };
 
@@ -273,6 +366,32 @@ const buildSearchContextMessage = (searchResult) => {
   return lines.join('\n\n');
 };
 
+const buildSystemPromptForModel = (model) => {
+  if (model === CODING_MODEL) return CODING_RESPONSE_SYSTEM_PROMPT;
+  return GENERAL_RESPONSE_SYSTEM_PROMPT;
+};
+
+const getGenerationSettingsForModel = (model) => {
+  if (model === CODING_MODEL) {
+    return {
+      temperature: 0.35,
+      max_tokens: 3072
+    };
+  }
+
+  if (model === REASONING_MODEL) {
+    return {
+      temperature: 0.45,
+      max_tokens: 3072
+    };
+  }
+
+  return {
+    temperature: 0.55,
+    max_tokens: 2560
+  };
+};
+
 export const chatCompletion = async (req, res, next) => {
   try {
     const apiKey = process.env.GROQ_API_KEY || process.env.VITE_GROQ_API_KEY;
@@ -301,9 +420,25 @@ export const chatCompletion = async (req, res, next) => {
         }
       });
     }
+    const selectedModel = selectModelForMessages(messages);
     const shouldSearch = Boolean(webSearchEnabled) && needsRealtimeSearch(messages);
     let webSearch = null;
-    let messagesForModel = messages;
+    const userMemoryPrompt = buildUserMemoryPrompt(req.user?.preferences?.memory, req.user?.name || '');
+    const systemMessages = [
+      {
+        role: 'system',
+        content: buildSystemPromptForModel(selectedModel)
+      }
+    ];
+
+    if (userMemoryPrompt) {
+      systemMessages.push({
+        role: 'system',
+        content: userMemoryPrompt
+      });
+    }
+
+    let messagesForModel = [...systemMessages, ...messages];
 
     if (shouldSearch && lastUserText) {
       try {
@@ -312,11 +447,12 @@ export const chatCompletion = async (req, res, next) => {
         if ((webSearch?.sources || []).length > 0) {
           const searchContext = buildSearchContextMessage(webSearch);
           messagesForModel = [
-            ...messages,
+            ...systemMessages,
             {
               role: 'system',
               content: searchContext
-            }
+            },
+            ...messages
           ];
         }
       } catch {
@@ -325,12 +461,12 @@ export const chatCompletion = async (req, res, next) => {
       }
     }
 
-    const selectedModel = selectModelForMessages(messages);
+    const generationSettings = getGenerationSettingsForModel(selectedModel);
     const payload = {
       model: selectedModel,
       messages: messagesForModel,
-      temperature: 0.7,
-      max_tokens: 2048,
+      temperature: generationSettings.temperature,
+      max_tokens: generationSettings.max_tokens,
       stream: false
     };
     const requestModel = async (model) => {
