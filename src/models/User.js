@@ -63,6 +63,46 @@ const userSchema = new mongoose.Schema({
     trim: true,
     maxlength: [280, 'Bio cannot exceed 280 characters']
   },
+  phone: {
+    type: String,
+    default: '',
+    trim: true,
+    maxlength: [30, 'Phone number cannot exceed 30 characters']
+  },
+  links: {
+    portfolio: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: [500, 'Portfolio URL cannot exceed 500 characters']
+    },
+    linkedin: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: [500, 'LinkedIn URL cannot exceed 500 characters']
+    },
+    github: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: [500, 'GitHub URL cannot exceed 500 characters']
+    }
+  },
+  linkBadges: {
+    portfolio: {
+      type: Boolean,
+      default: false
+    },
+    linkedin: {
+      type: Boolean,
+      default: false
+    },
+    github: {
+      type: Boolean,
+      default: false
+    }
+  },
   preferences: {
     theme: {
       type: String,
@@ -73,6 +113,33 @@ const userSchema = new mongoose.Schema({
       type: String,
       enum: ['local', 'session'],
       default: 'local'
+    },
+    memory: {
+      preferredName: {
+        type: String,
+        default: '',
+        trim: true,
+        maxlength: [80, 'Preferred name cannot exceed 80 characters']
+      },
+      responseTone: {
+        type: String,
+        default: '',
+        trim: true,
+        maxlength: [80, 'Response tone cannot exceed 80 characters']
+      },
+      customPrompt: {
+        type: String,
+        default: '',
+        trim: true,
+        maxlength: [1200, 'Custom prompt cannot exceed 1200 characters']
+      },
+      savedMemories: [
+        {
+          type: String,
+          trim: true,
+          maxlength: [240, 'Each saved memory cannot exceed 240 characters']
+        }
+      ]
     }
   },
   lastLogin: {

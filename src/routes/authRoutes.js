@@ -138,6 +138,11 @@ const updateProfileValidation = [
     .isLength({ min: 2, max: 50 })
     .withMessage('Name must be between 2 and 50 characters')
     .trim(),
+  body('phone')
+    .optional()
+    .isLength({ max: 30 })
+    .withMessage('Phone number cannot exceed 30 characters')
+    .trim(),
   body('avatar')
     .optional()
     .isString()
@@ -147,7 +152,31 @@ const updateProfileValidation = [
   body('bio')
     .optional()
     .isLength({ max: 280 })
-    .withMessage('Bio cannot exceed 280 characters')
+    .withMessage('Bio cannot exceed 280 characters'),
+  body('links.portfolio')
+    .optional({ values: 'falsy' })
+    .isURL({ protocols: ['http', 'https'], require_protocol: true })
+    .withMessage('Portfolio link must be a valid URL'),
+  body('links.linkedin')
+    .optional({ values: 'falsy' })
+    .isURL({ protocols: ['http', 'https'], require_protocol: true })
+    .withMessage('LinkedIn link must be a valid URL'),
+  body('links.github')
+    .optional({ values: 'falsy' })
+    .isURL({ protocols: ['http', 'https'], require_protocol: true })
+    .withMessage('GitHub link must be a valid URL'),
+  body('linkBadges.portfolio')
+    .optional()
+    .isBoolean()
+    .withMessage('Portfolio badge toggle must be true or false'),
+  body('linkBadges.linkedin')
+    .optional()
+    .isBoolean()
+    .withMessage('LinkedIn badge toggle must be true or false'),
+  body('linkBadges.github')
+    .optional()
+    .isBoolean()
+    .withMessage('GitHub badge toggle must be true or false')
 ];
 
 const verifyLoginVerificationOtpValidation = [

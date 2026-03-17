@@ -61,7 +61,13 @@ export const signup = async (req, res, next) => {
       emailVerified: true,
       preferences: {
         theme: 'cyber',
-        defaultMode: 'session'
+        defaultMode: 'session',
+        memory: {
+          preferredName: '',
+          responseTone: '',
+          customPrompt: '',
+          savedMemories: []
+        }
       }
     });
     await SignupOtp.deleteOne({ email });
@@ -405,7 +411,7 @@ export const getMe = async (req, res, next) => {
 // @access  Private
 export const updateProfile = async (req, res, next) => {
   try {
-    const { name, avatar, bio } = req.body;
+    const { name, avatar, bio, phone, links, linkBadges } = req.body;
 
     const updates = {};
     if (typeof name === 'string') {
@@ -422,6 +428,46 @@ export const updateProfile = async (req, res, next) => {
 
     if (typeof bio === 'string') {
       updates.bio = bio.trim();
+    }
+
+    if (typeof phone === 'string') {
+      updates.phone = phone.trim();
+    }
+
+    if (links && typeof links === 'object') {
+      const currentLinks = req.user.links || {};
+      updates.links = {
+        portfolio:
+          typeof links.portfolio === 'string'
+            ? links.portfolio.trim()
+            : currentLinks.portfolio || '',
+        linkedin:
+          typeof links.linkedin === 'string'
+            ? links.linkedin.trim()
+            : currentLinks.linkedin || '',
+        github:
+          typeof links.github === 'string'
+            ? links.github.trim()
+            : currentLinks.github || ''
+      };
+    }
+
+    if (linkBadges && typeof linkBadges === 'object') {
+      const currentBadges = req.user.linkBadges || {};
+      updates.linkBadges = {
+        portfolio:
+          typeof linkBadges.portfolio === 'boolean'
+            ? linkBadges.portfolio
+            : Boolean(currentBadges.portfolio),
+        linkedin:
+          typeof linkBadges.linkedin === 'boolean'
+            ? linkBadges.linkedin
+            : Boolean(currentBadges.linkedin),
+        github:
+          typeof linkBadges.github === 'boolean'
+            ? linkBadges.github
+            : Boolean(currentBadges.github)
+      };
     }
 
     const user = await User.findByIdAndUpdate(
@@ -446,15 +492,40 @@ export const updateProfile = async (req, res, next) => {
 // @access  Private
 export const updatePreferences = async (req, res, next) => {
   try {
-    const { theme, defaultMode } = req.body;
-    const normalizedTheme = theme === 'dark' ? 'cyber' : theme;
+    const { theme, defaultMode, memory } = req.body;
+    const currentPreferences = req.user.preferences || {};
+    const currentMemory = currentPreferences.memory || {};
+
+    const normalizedMemory = {
+      preferredName:
+        typeof memory?.preferredName === 'string'
+          ? memory.preferredName.trim().slice(0, 80)
+          : currentMemory.preferredName || '',
+      responseTone:
+        typeof memory?.responseTone === 'string'
+          ? memory.responseTone.trim().slice(0, 80)
+          : currentMemory.responseTone || '',
+      customPrompt:
+        typeof memory?.customPrompt === 'string'
+          ? memory.customPrompt.trim().slice(0, 1200)
+          : currentMemory.customPrompt || '',
+      savedMemories: Array.isArray(memory?.savedMemories)
+        ? memory.savedMemories
+            .map((item) => (typeof item === 'string' ? item.trim().slice(0, 240) : ''))
+            .filter(Boolean)
+            .slice(0, 25)
+        : Array.isArray(currentMemory.savedMemories)
+          ? currentMemory.savedMemories
+          : []
+    };
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
       {
         preferences: {
-          theme: normalizedTheme || req.user.preferences.theme,
-          defaultMode: defaultMode || req.user.preferences.defaultMode
+          theme: theme || currentPreferences.theme,
+          defaultMode: defaultMode || currentPreferences.defaultMode,
+          memory: normalizedMemory
         }
       },
       { new: true, runValidators: true }

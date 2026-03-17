@@ -4,9 +4,12 @@ const GROQ_API_URL =
   process.env.GROQ_API_URL ||
   process.env.VITE_GROQ_API_URL ||
   'https://api.groq.com/openai/v1/chat/completions';
-const GENERAL_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
-const CODING_MODEL = 'meta-llama/llama-4-maverick-17b-128e-instruct';
-const META_FALLBACK_MODEL = 'openai/gpt-oss-120b';
+const GENERAL_MODEL = 'llama-3.1-8b-instant';
+const STRONG_FALLBACK_MODEL = 'llama-3.3-70b-versatile';
+const REASONING_MODEL = 'openai/gpt-oss-120b';
+const REASONING_ALTERNATIVE_MODEL = 'moonshotai/kimi-k2-instruct-0905';
+const CODING_MODEL = 'qwen/qwen3-32b';
+const VISION_MODEL = 'meta/llama-3.2-90b-vision-instruct';
 const TAVILY_API_URL = 'https://api.tavily.com/search';
 const SERPER_API_URL = 'https://google.serper.dev/search';
 
@@ -14,6 +17,8 @@ const SEARCH_INTENT_REGEX =
   /\b(search|find|look\s*up|google|latest|today|news|current|real[-\s]?time|updated?)\b/i;
 const CODE_INTENT_REGEX =
   /(```|`[^`]+`|\b(code|coding|debug|bug|error|stack trace|exception|refactor|optimiz(e|ation)|algorithm|complexity|regex|sql|query|api|endpoint|function|class|typescript|javascript|python|java|c\+\+|react|node|express|mongodb)\b)/i;
+const REASONING_INTENT_REGEX =
+  /\b(reason|reasoning|analy[sz]e|analysis|think\s+step|step[-\s]?by[-\s]?step|complex|deep|carefully|compare|trade[\s-]?off|pros?\s+and\s+cons|why|explain\s+in\s+detail|detailed)\b/i;
 
 const getUserTextFromContent = (content) => {
   if (typeof content === 'string') return content;
@@ -40,6 +45,12 @@ const getLastUserMessageText = (messages = []) => {
   return getUserTextFromContent(lastUser.content);
 };
 
+const hasImageContent = (messages = []) =>
+  messages.some((message) => {
+    if (!Array.isArray(message?.content)) return false;
+    return message.content.some((part) => part?.type === 'image_url');
+  });
+
 const needsRealtimeSearch = (messages = []) => {
   const lastUserText = getLastUserMessageText(messages);
   if (!lastUserText) return false;
@@ -48,11 +59,27 @@ const needsRealtimeSearch = (messages = []) => {
 
 const selectModelForMessages = (messages = []) => {
   const lastUserText = getLastUserMessageText(messages);
+  if (hasImageContent(messages)) return VISION_MODEL;
   if (!lastUserText) return GENERAL_MODEL;
-  return CODE_INTENT_REGEX.test(lastUserText) ? CODING_MODEL : GENERAL_MODEL;
+  if (CODE_INTENT_REGEX.test(lastUserText)) return CODING_MODEL;
+  if (REASONING_INTENT_REGEX.test(lastUserText) || lastUserText.length > 900) return REASONING_MODEL;
+  return GENERAL_MODEL;
 };
 
-const isMetaModel = (model = '') => /^meta[-/]/i.test(model);
+const getFallbackChainForModel = (model = '') => {
+  switch (model) {
+    case GENERAL_MODEL:
+      return [STRONG_FALLBACK_MODEL, REASONING_ALTERNATIVE_MODEL];
+    case CODING_MODEL:
+      return [STRONG_FALLBACK_MODEL, REASONING_ALTERNATIVE_MODEL];
+    case VISION_MODEL:
+      return [STRONG_FALLBACK_MODEL];
+    case REASONING_MODEL:
+      return [REASONING_ALTERNATIVE_MODEL, STRONG_FALLBACK_MODEL];
+    default:
+      return [STRONG_FALLBACK_MODEL, REASONING_ALTERNATIVE_MODEL];
+  }
+};
 
 const STATIC_FAQ_RESPONSES = [
   {
@@ -331,9 +358,12 @@ export const chatCompletion = async (req, res, next) => {
       return { ok: true, data, model };
     };
 
-    let result = await requestModel(selectedModel);
-    if (!result.ok && isMetaModel(selectedModel)) {
-      result = await requestModel(META_FALLBACK_MODEL);
+    const candidateModels = [selectedModel, ...getFallbackChainForModel(selectedModel)];
+    let result = { ok: false, error: 'No model attempts were made.' };
+
+    for (const model of candidateModels) {
+      result = await requestModel(model);
+      if (result.ok) break;
     }
 
     if (!result.ok) {
