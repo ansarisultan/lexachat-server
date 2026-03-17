@@ -5,6 +5,7 @@ const GROQ_API_URL =
   process.env.VITE_GROQ_API_URL ||
   'https://api.groq.com/openai/v1/chat/completions';
 const GENERAL_MODEL = 'llama-3.3-70b-versatile';
+const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 const STRONG_FALLBACK_MODEL = 'openai/gpt-oss-120b';
 const REASONING_MODEL = 'openai/gpt-oss-120b';
 const CODING_MODEL = 'openai/gpt-oss-120b';
@@ -154,7 +155,7 @@ const needsRealtimeSearch = (messages = []) => {
 
 const selectModelForMessages = (messages = []) => {
   const lastUserText = getLastUserMessageText(messages);
-  if (hasImageContent(messages)) return GENERAL_MODEL;
+  if (hasImageContent(messages)) return VISION_MODEL;
   if (!lastUserText) return GENERAL_MODEL;
   if (CODE_INTENT_REGEX.test(lastUserText)) return CODING_MODEL;
   if (REASONING_INTENT_REGEX.test(lastUserText) || lastUserText.length > 900) return REASONING_MODEL;
@@ -163,6 +164,8 @@ const selectModelForMessages = (messages = []) => {
 
 const getFallbackChainForModel = (model = '') => {
   switch (model) {
+    case VISION_MODEL:
+      return [GENERAL_MODEL, STRONG_FALLBACK_MODEL];
     case GENERAL_MODEL:
       return [STRONG_FALLBACK_MODEL];
     case CODING_MODEL:
