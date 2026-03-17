@@ -7,7 +7,7 @@ const GROQ_API_URL =
 const GENERAL_MODEL = 'llama-3.3-70b-versatile';
 const STRONG_FALLBACK_MODEL = 'openai/gpt-oss-120b';
 const REASONING_MODEL = 'openai/gpt-oss-120b';
-const CODING_MODEL = 'qwen/qwen3-32b';
+const CODING_MODEL = 'openai/gpt-oss-120b';
 const TAVILY_API_URL = 'https://api.tavily.com/search';
 const SERPER_API_URL = 'https://google.serper.dev/search';
 
