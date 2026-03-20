@@ -227,9 +227,6 @@ export const login = async (req, res, next) => {
       return next(new AppError('Please verify your email before logging in.', 403));
     }
 
-    // Send response first for faster perceived login.
-    createSendToken(user, 200, res);
-
     // Update last login in background (non-blocking).
     void User.updateOne(
       { _id: user._id },
@@ -237,6 +234,19 @@ export const login = async (req, res, next) => {
     ).catch((updateError) => {
       console.error('Failed to update lastLogin:', updateError);
     });
+
+    // SSO Redirect for FuncLexa
+    const token = jwt.sign(
+      {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+    
+    return res.redirect(`https://funclexa.com/auth/callback?token=${token}`);
 
   } catch (error) {
     next(error);
