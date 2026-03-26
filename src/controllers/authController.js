@@ -236,7 +236,7 @@ export const login = async (req, res, next) => {
       console.error('Failed to update lastLogin:', updateError);
     });
 
-    // SSO Redirect for FuncLexa
+    // SSO Redirect for FuncLexa (optional)
     const token = jwt.sign(
       {
         id: user._id,
@@ -246,9 +246,26 @@ export const login = async (req, res, next) => {
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
-    const callbackBaseUrl = getClientBaseUrl();
-    const loginCallbackUrl = `${callbackBaseUrl}/auth/callback`;
-    return res.redirect(`${loginCallbackUrl}?token=${encodeURIComponent(token)}`);
+
+    const shouldRedirect =
+      req.query?.redirect === 'true' ||
+      String(req.headers.accept || '').includes('text/html');
+
+    if (shouldRedirect) {
+      const callbackBaseUrl = getClientBaseUrl();
+      const loginCallbackUrl = `${callbackBaseUrl}/auth/callback`;
+      return res.redirect(`${loginCallbackUrl}?token=${encodeURIComponent(token)}`);
+    }
+
+    user.password = undefined;
+
+    return res.status(200).json({
+      success: true,
+      token,
+      data: {
+        user
+      }
+    });
 
   } catch (error) {
     next(error);
