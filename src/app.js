@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
+import jwt from 'jsonwebtoken';
 import authRoutes from './routes/authRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
@@ -55,6 +56,32 @@ app.use((req, res, next) => {
     'Content-Security-Policy',
     "script-src 'self' https://www.googletagmanager.com 'unsafe-inline';"
   );
+  next();
+});
+
+app.use((req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (authHeader) {
+    const token = authHeader.split(" ")[1];
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+      req.user = decoded;
+
+      // auto login session
+      res.cookie("lexachat_session", token, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",
+      });
+
+    } catch (err) {
+      console.log("Invalid token");
+    }
+  }
+
   next();
 });
 

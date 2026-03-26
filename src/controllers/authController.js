@@ -9,7 +9,8 @@ import {
   sendPasswordResetEmail,
   sendEmailVerificationEmail,
   sendSignupOtpEmail,
-  sendWelcomeEmail
+  sendWelcomeEmail,
+  getClientBaseUrl
 } from '../utils/email.js';
 
 // Generate JWT Token
@@ -245,8 +246,9 @@ export const login = async (req, res, next) => {
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
-    
-    return res.redirect(`https://funclexa.com/auth/callback?token=${token}`);
+    const callbackBaseUrl = getClientBaseUrl();
+    const loginCallbackUrl = `${callbackBaseUrl}/auth/callback`;
+    return res.redirect(`${loginCallbackUrl}?token=${encodeURIComponent(token)}`);
 
   } catch (error) {
     next(error);

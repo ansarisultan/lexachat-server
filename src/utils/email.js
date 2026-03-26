@@ -23,7 +23,7 @@ const isLikelyApiUrl = (value) => {
   }
 };
 
-const getClientBaseUrl = () => {
+export const getClientBaseUrl = () => {
   const candidates = [
     process.env.RESET_PASSWORD_URL_BASE,
     process.env.FRONTEND_URL,
